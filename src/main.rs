@@ -1,13 +1,34 @@
 use std::sync::Mutex;
 
-use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{
+    get, http::header::ContentEncoding, middleware, web, App, HttpResponse, HttpServer, Responder,
+};
 
-#[actix_web::main] // or #[tokio::main]
+#[get("/")]
+async fn demo1() -> HttpResponse {
+    HttpResponse::Ok()
+        // v- disable compression
+        .insert_header(ContentEncoding::Identity)
+        .body("data")
+}
+
+#[actix_web::main]
 async fn main() -> std::io::Result<()> {
     HttpServer::new(|| {
         App::new()
-            .configure(config)
-            .service(web::scope("/api").configure(scope_config))
+            .wrap(middleware::Compress::default())
+            .service(demo1)
+    })
+    .bind(("127.0.0.1", 8080))?
+    .run()
+    .await
+}
+
+async fn _run_server() -> std::io::Result<()> {
+    HttpServer::new(|| {
+        App::new()
+            .configure(_config)
+            .service(web::scope("/api").configure(_scope_config))
             .route(
                 "/",
                 web::get().to(|| async { HttpResponse::Ok().body("/") }),
@@ -32,14 +53,14 @@ struct AppStateWithCounter {
 }
 
 #[get("/")]
-async fn index(data: web::Data<AppStateWithCounter>) -> impl Responder {
+async fn _index(data: web::Data<AppStateWithCounter>) -> impl Responder {
     let mut counter = data.counter.lock().unwrap();
     *counter += 1;
     format!("Request number: {counter}")
 }
 
 // this function could be located in a different module
-fn scope_config(cfg: &mut web::ServiceConfig) {
+fn _scope_config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::resource("/test")
             .route(web::get().to(|| async { HttpResponse::Ok().body("test") }))
@@ -48,7 +69,7 @@ fn scope_config(cfg: &mut web::ServiceConfig) {
 }
 
 // this function could be located in a different module.
-fn config(cfg: &mut web::ServiceConfig) {
+fn _config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::resource("/app")
             .route(web::get().to(|| async { HttpResponse::Ok().body("app") }))
