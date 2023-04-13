@@ -1,78 +1,64 @@
-use std::sync::Mutex;
+mod handler;
+mod model;
+mod schema;
 
-use actix_web::{
-    get, http::header::ContentEncoding, middleware, web, App, HttpResponse, HttpServer, Responder,
-};
+use actix_cors::Cors;
+use actix_web::{http::header, middleware::Logger, App, HttpResponse, HttpServer, Responder, web};
+use dotenv::dotenv;
+use serde_json::json;
+use sqlx::mysql::{MySqlPool, MySqlPoolOptions};
 
-#[get("/")]
-async fn demo1() -> HttpResponse {
-    HttpResponse::Ok()
-        // v- disable compression
-        .insert_header(ContentEncoding::Identity)
-        .body("data")
+pub struct AppState {
+    db: MySqlPool,
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    HttpServer::new(|| {
+    println!("web_project start");
+    if std::env::var_os("RUST_LOG").is_none() {
+        std::env::set_var("RUST_LOG", "actix_web=info")
+    }
+    dotenv().ok();
+    env_logger::init();
+    std::env::vars().for_each(|item|{
+        println!("env {} | {}",item.0,item.1)
+    });
+
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let pool = match MySqlPoolOptions::new()
+        .max_connections(10)
+        .connect(&database_url)
+        .await
+    {
+        Ok(pool) => {
+            println!("✅ Connection to the database is successful!");
+            pool
+        }
+        Err(err) => {
+            println!("🔥 Failded to connect to the database: {:?}", err);
+            std::process::exit(1);
+        }
+    };
+
+    println!("🚀 Server started successfully");
+
+    HttpServer::new(move || {
+        let cors = Cors::default()
+            .allow_any_origin()
+            .allowed_methods(vec!["GET", "POST", "PATCH", "DELETE"])
+            .allowed_headers(vec![
+                header::CONTENT_TYPE,
+                header::AUTHORIZATION,
+                header::ACCEPT,
+            ])
+            .supports_credentials();
         App::new()
-            .wrap(middleware::Compress::default())
-            .service(demo1)
+            .app_data(web::Data::new(AppState { db: pool.clone() }))
+            .configure(handler::config)
+            .wrap(cors)
+            .wrap(Logger::default())
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind(("127.0.0.1", 7878))?
     .run()
     .await
-}
-
-async fn _run_server() -> std::io::Result<()> {
-    HttpServer::new(|| {
-        App::new()
-            .configure(_config)
-            .service(web::scope("/api").configure(_scope_config))
-            .route(
-                "/",
-                web::get().to(|| async { HttpResponse::Ok().body("/") }),
-            )
-    })
-    .bind(("127.0.0.1", 8080))?
-    .run()
-    .await
-}
-
-#[get("/hello/{name}")]
-async fn greet(name: web::Path<String>) -> impl Responder {
-    format!("Hello {name}!")
-}
-
-// struct AppState {
-//     app_name: String,
-// }
-
-struct AppStateWithCounter {
-    counter: Mutex<i32>,
-}
-
-#[get("/")]
-async fn _index(data: web::Data<AppStateWithCounter>) -> impl Responder {
-    let mut counter = data.counter.lock().unwrap();
-    *counter += 1;
-    format!("Request number: {counter}")
-}
-
-// this function could be located in a different module
-fn _scope_config(cfg: &mut web::ServiceConfig) {
-    cfg.service(
-        web::resource("/test")
-            .route(web::get().to(|| async { HttpResponse::Ok().body("test") }))
-            .route(web::head().to(HttpResponse::MethodNotAllowed)),
-    );
-}
-
-// this function could be located in a different module.
-fn _config(cfg: &mut web::ServiceConfig) {
-    cfg.service(
-        web::resource("/app")
-            .route(web::get().to(|| async { HttpResponse::Ok().body("app") }))
-            .route(web::head().to(HttpResponse::MethodNotAllowed)),
-    );
 }

@@ -1,1 +1,1 @@
-/Users/powerless/Documents/clion_space/web_project/target/debug/web_project: /Users/powerless/Documents/clion_space/web_project/src/main.rs
+/Users/powerless/Documents/clion_space/web_project/target/debug/web_project: /Users/powerless/Documents/clion_space/web_project/src/handler.rs /Users/powerless/Documents/clion_space/web_project/src/main.rs /Users/powerless/Documents/clion_space/web_project/src/model.rs /Users/powerless/Documents/clion_space/web_project/src/schema.rs
