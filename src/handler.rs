@@ -1,3 +1,5 @@
+mod common_handler;
+
 use crate::{
     model::{NoteModel, NoteModelResponse},
     AppState,
@@ -6,12 +8,7 @@ use crate::schema::{CreateNoteSchema, FilterOptions, UpdateNoteSchema};
 use actix_web::{delete, get, patch, post, web, HttpResponse, Responder};
 use serde_json::json;
 
-#[get("/health")]
-async fn health_checker_handler() -> impl Responder {
-    const MESSAGE: &str = "Build Simple CRUD API with Rust, SQLX, MySQL, and Actix Web";
-
-    HttpResponse::Ok().json(json!({"status": "success","message": MESSAGE}))
-}
+use common_handler::common;
 
 #[get("/notes")]
 pub async fn note_list_handler(
@@ -241,7 +238,7 @@ fn filter_db_record(note: &NoteModel) -> NoteModelResponse {
 
 pub fn config(conf: &mut web::ServiceConfig) {
     let scope = web::scope("/api")
-        .service(health_checker_handler)
+        .service(common::health_check)
         .service(note_list_handler)
         .service(create_note_handler)
         .service(get_note_handler)
